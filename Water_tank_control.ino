@@ -6,9 +6,9 @@
 Servo myServo;
 
 int level;
-double kp = 12.0, ap;
+double ap = 0, ai = 0, ad = 0, output, error = 0, errora = 0;
+double kp = 2, ki = 0.05, kd = 0.09, tm = 0.01, salida = 0;
 int setPoint = 1250;
-double error = 0.0;
 
 void setup() {
   pinMode(ULTRASONIC_ECHO, INPUT);
@@ -19,8 +19,8 @@ void setup() {
 }
 
 void loop() {
-  delay(500);
-
+  //delay(10);
+  
   control();
 
   Serial.println("Distance: " + String(getDistance()) + " Reference: " + String(getReference()) + " Error: " + String(error));
@@ -44,24 +44,6 @@ float getDistance() {
   return distance;
 }
 
-// Sets a relation between the setPoint and the distance,
-// the distance is between the sensor and the water.
-float getReference() {
-  if (setPoint == 2000) {
-    return 3.84;
-  } else if (setPoint == 1750) {
-    return 5.95;
-  } else if (setPoint == 1500) {
-    return 8.04;
-  } else if (setPoint == 1250) {
-    return 10.20;
-  } else if (setPoint == 1000) {
-    return 12.30;
-  } else if (setPoint == 750) {
-    return 15.06;
-  }
-}
-
 int getLevel() {
   static int level;
   float errorMarginTop = 0.2; // cm
@@ -79,9 +61,28 @@ int getLevel() {
     level = 1000;
   } else if(getDistance() >= 15.06 - errorMarginBottom && getDistance() <= 15.06 + errorMarginTop) {
     level = 750;
+    return 15.06 - 0.7;
   }
   
   return level;
+}
+
+// Sets a relation between the setPoint and the distance,
+// the distance is between the sensor and the water.
+float getReference() {
+  if (setPoint == 2000) {
+    return 3.84 - 0.5;
+  } else if (setPoint == 1750) {
+    return 5.95 - 0.2;
+  } else if (setPoint == 1500) {
+    return 8.04 - 0.3;
+  } else if (setPoint == 1250) {
+    return 10.20;
+  } else if (setPoint == 1000) {
+    return 12.30 - 0.5;
+  } else if (setPoint == 750) {
+    return 15.06 - 0.7;
+  }
 }
 
 void closeValve() {
@@ -96,23 +97,21 @@ void openValve() {
 
 void control() {
   error = getReference() - getDistance();
-
-  if (getReference() < getDistance()) {
-    closeValve();
-  } else if (getReference() > getDistance()) {
-    openValve();
+  ap = kp * error;
+  ai = ki * ((tm * errora) + (tm * (error - errora)) / 2);
+  ad = kd * ((error - errora) / tm);
+  output += ap + ai + ad;
+  //Serial.println(output);
+  if (output > 100) {
+    output = 100;
   }
+  if (output < 0) {
+    output = 0;
+  }
+  errora = error;
 
-  /*
-  if (getDistance() < 2.0) {
-    closeValve();
-  } else if (error > 4.0) {
-    openValve();
-  } else if (error > 0.0 && error < 1.5) {
-    openValve();
-  } else if(error > -3.0 && error < 0.0) {
-    closeValve();
-  } else if (error < -3.0) {
-    closeValve();
-  } */
+  int valveAngle = map(output, 0, 100, 70, 120);
+  //Serial.println("Angle: " + String(valveAngle) + " output: " + String(output));
+
+  myServo.write(valveAngle);
 }
